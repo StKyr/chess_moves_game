@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Chess</title>
+<style>
+:root {
+  --light: #f0d9b5;
+  --dark: #b58863;
+  --panel: #ffffff;
+  --bg: #eef1f5;
+  --text: #222;
+  --muted: #68707a;
+  --accent: #2563eb;
+  --danger: #c62828;
+  --success: #18794e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+button, select, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .08);
+}
+
+h1 { margin: 0 0 6px; }
+h2 { margin: 0 0 14px; }
+.subtitle { color: var(--muted); margin-bottom: 22px; }
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.tab {
+  border: 1px solid #cbd5e1;
+  background: white;
+  border-radius: 10px;
+  padding: 11px;
+  font-weight: 700;
+}
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.field label { font-weight: 700; }
+.field select, .field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: white;
+}
+
+.rush-options {
+  margin-top: 14px;
+  display: none;
+}
+.rush-options.visible { display: block; }
+
+.best-info {
+  margin-top: 15px;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.primary, .secondary, .danger {
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-weight: 700;
+}
+.primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+}
+.secondary {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: var(--text);
+}
+.danger {
+  border: 1px solid #efb2b2;
+  background: white;
+  color: var(--danger);
+}
+
+.hidden { display: none !important; }
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+}
+
+#board {
+  width: min(76vw, 720px);
+  max-width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  border: 6px solid #3f2f25;
+  border-radius: 6px;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+.square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  font-size: clamp(28px, 6vw, 56px);
+  line-height: 1;
+}
+.square.light { background: var(--light); }
+.square.dark { background: var(--dark); }
+.square.target { cursor: pointer; }
+.square.target::after {
+  content: "";
+  position: absolute;
+  width: 23%;
+  height: 23%;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, .48);
+}
+.square.last::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 235, 59, .24);
+}
+.square.solution-arrow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(37, 99, 235, .12);
+}
+.coord-file, .coord-rank {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: .7;
+}
+.coord-file { right: 4px; bottom: 3px; }
+.coord-rank { left: 4px; top: 3px; }
+
+.star {
+  position: relative;
+  z-index: 2;
+  color: #f8c928;
+  text-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.piece {
+  position: relative;
+  z-index: 3;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.3));
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.stat strong {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.stat span {
+  display: block;
+  margin-top: 2px;
+  font-size: 21px;
+  font-weight: 800;
+}
+.message {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eff6ff;
+  min-height: 44px;
+}
+.message.good { background: #ecfdf5; color: #166534; }
+.message.bad { background: #fef2f2; color: #991b1b; }
+.message.neutral { background: #f8fafc; color: #475569; }
+
+.solution-panel {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+}
+.solution-title { font-weight: 800; margin-bottom: 8px; }
+.solution-line {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.solution-chip {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  padding: 4px 7px;
+}
+
+.rush-clock {
+  font-size: 30px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, .58);
+  z-index: 50;
+  padding: 20px;
+}
+.overlay-card {
+  width: min(440px, 100%);
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 15px 50px rgba(0,0,0,.25);
+}
+.overlay-card h2 { margin-bottom: 8px; }
+.overlay-card p { color: var(--muted); }
+
+.drag-ghost {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  font-size: 56px;
+}
+
+@media (max-width: 780px) {
+  #app { padding: 12px; }
+  .fields { grid-template-columns: 1fr; }
+  .game-layout { grid-template-columns: 1fr; }
+  #board { width: min(94vw, 720px); margin: 0 auto; }
+  .sidebar { width: min(94vw, 720px); margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="menu" class="panel">
+    <h1>Star Chess</h1>
+    <div class="subtitle">Capture every star in the fewest possible moves.</div>
+
+    <div class="tabs">
+      <button class="tab active" data-mode="casual">Casual</button>
+      <button class="tab" data-mode="streak">Puzzle Streak</button>
+      <button class="tab" data-mode="rush">Puzzle Rush</button>
+    </div>
+
+    <div class="fields">
+      <div class="field">
+        <label for="pieceSelect">Piece</label>
+        <select id="pieceSelect">
+          <option value="rook">Rook</option>
+          <option value="bishop">Bishop</option>
+          <option value="knight">Knight</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="nodes">Nodes (start + stars)</label>
+        <input id="nodes" type="number" min="6" max="10" value="8">
+      </div>
+
+      <div class="field">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="rushOptions" class="rush-options">
+      <div class="field" style="max-width:240px;">
+        <label for="rushTime">Rush duration</label>
+        <select id="rushTime">
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="bestInfo" class="best-info"></div>
+
+    <div class="actions">
+      <button id="startBtn" class="primary">Start Game</button>
+    </div>
+  </section>
+
+  <section id="game" class="hidden">
+    <div class="game-layout">
+      <div>
+        <div id="board"></div>
+      </div>
+
+      <aside class="sidebar">
+        <div class="stat-grid">
+          <div class="stat"><strong>PIECE</strong><span id="pieceStat">—</span></div>
+          <div class="stat"><strong>STARS LEFT</strong><span id="starsStat">—</span></div>
+          <div class="stat"><strong>MOVES</strong><span id="movesStat">—</span></div>
+          <div class="stat"><strong>OPTIMAL</strong><span id="optimalStat">—</span></div>
+          <div class="stat"><strong>EXTRA EDGES</strong><span id="extraStat">—</span></div>
+          <div class="stat"><strong id="recordLabel">MODE</strong><span id="recordStat">—</span></div>
+        </div>
+
+        <div id="rushStatBox" class="stat hidden">
+          <strong>TIME LEFT</strong>
+          <span id="rushClock" class="rush-clock">2:00</span>
+        </div>
+
+        <div id="message" class="message">Loading puzzle…</div>
+
+        <div class="actions">
+          <button id="resetBtn" class="secondary">Reset</button>
+          <button id="solutionBtn" class="secondary">Show Solution</button>
+        </div>
+        <div class="actions" style="margin-top:0;">
+          <button id="newPuzzleBtn" class="primary">New Puzzle</button>
+          <button id="backBtn" class="secondary">Back to Menu</button>
+        </div>
+
+        <div id="solutionPanel" class="solution-panel hidden">
+          <div class="solution-title">Solution</div>
+          <div id="solutionLine" class="solution-line"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</div>
+
+<div id="overlay" class="overlay hidden">
+  <div class="overlay-card">
+    <h2 id="overlayTitle">Game Over</h2>
+    <p id="overlayText"></p>
+    <button id="overlayBtn" class="primary">Continue</button>
+  </div>
+</div>
+
+<script>
+const BOARD_SIZE = 8;
+const PIECES = {
+  rook: { name: "Rook", symbol: "♜" },
+  bishop: { name: "Bishop", symbol: "♝" },
+  knight: { name: "Knight", symbol: "♞" }
+};
+
+// ============================================================================
+// PUZZLE DATABASE
+// ============================================================================
+//
+// Paste the CONTENT of star_chess_puzzles.js generated by
+// pack_star_chess_layouts.py into the array below.
+//
+// That file contains compact strings such as:
+//
+//   "...",
+//   "...",
+//   "..."
+//
+// Do NOT paste the `const PUZZLES =` line itself. Paste the strings between
+// its square brackets into this array.
+//
+// Example:
+// const PUZZLE_DATABASE = [
+//   "cABCD123...",
+//   "...",
+// ];
+//
+// ============================================================================
+const PUZZLE_DATABASE = ["OKIgmOLrvqC","bMeXFhzl3","AlhnP3z","RKYqcx6se","B6in/85Z","dxjaIs6l3Th","dUvLSJbNfEZ","TJbiw5rPGUv","hZjpzkaQKE","Em+WX3xRVtq","ipYJDSICRio","JYdF1w3f/6S","aGNbp7t/","aaRKcHjI","N74oruGAYd","Wk5wiGPdv","QGPkyg7m","bk2SEZrdP","SrQJAbNp7m","SmUiNf7yk2","Zvm7pUC","DnH32zLOup","Zwi0mUG","ZIaMes+","bpiQr5PGU","aASgpbt/","aWkS29r5","f0qku/1m","f4yjUap6","cJASEft2k5","EyKPnkE8/7b","cLSAbpNfEZ","giRbq7sy8","aAJQiwb/","K91wYdF","TXFTu1+se6o","VydPGUi9","du8zhTlXsRD","OHCSy3XUQou","TOHVnMFTlKY","GHf/7DAo","HhBx03wIN","Udr5PGb","ZHVDKc4","ar0mUGi9","I30wAEHvrL","AGmhn/6","eq7xis2","b3u8hTBl6","Cday1wAHn","GzTQV1ya","OEHCKin/PLI","OJKqorLOIgn","A2zbeZ5","U+3lXsR","aaRDVOjI","iTict+0u9zp","WRYKu8qVH","Pq4cuTh","U7t2/kW","BjgIPnk8","R092kPrZE","WBToMeXl3","DY4QSVtquG","JfcZxRVQoIM","cCJQipwbtf","Qr9vLgEW","at2vdPk/","EJMsotN96aC","PWPdv9Z","HAopsEBhl","W9iwbA2vd","K7z2ebD","cMDVOHcKl6","PEZryk2","AuGBptV","ejZTEKQ","TCv90fNiQrP","hbhwqgaQKA","VUwGPdLg","X4jRsXOHVn","ZNbJQiw","Q3+sezhT","RGUp7mLZr","LQTz2wYA","U92bNiQ","OmjgABZeGC6","ErovH/6SVRx","FAY47be","hVGXmcLBQh","bvm7fWPdC","O96yadF1xRX","Bimg4QUX","cft7gSJAbG","IwAEkhmO2z","Tr5dvCJASEf","Wjs+aoTlz","KFNJhl9","NJhil9NKqu","RdygSJAbw","D9dZB5+WSq","WRDVjI+3l","K32WTzw","SmLv2/tf0i","GQwIP3yC","ZPdCQr5","KDLOmj7","Gli6CFdZ","THVDKBcq8hF","Q3cBIRjx","dPWfNp7mvd5","IAIorvPKy1","P5k/JQi","YykWNGUCm7g","CMNJh59da","W3+1jRDVH","Xq8YDMesao","AxZf3PL","Un1+seD","K+2yaeG","JfHnk8cYAor","AmjgAov","P4qYKcH","V6x4jRsX","Tes+aMox4q8","Y/tfESAk5dC","B03zL74Y","VaFh81j4","h6pzkTZjdX","W2tf0ipbJ","fjpYSDJT","i0q71/u9syo","Qwb2SgEf","iTJDSBLFWcm","BCKimOup","fjUev+tz","LDFdZxBH","J4/ngoINtqS","B0w1d96i","J47rLJpvPM0","HDTz3xRUs","TJASENGUCm7","NLTrosURV1","el28r1k","NSi6KNJhmG","cLZENGUCm7","SCJASg7tbN","b8ulXzhTB","TbJ2vdPygEf","UjR1ucH","BZcf3XRp","Su3lXFaIjx","Wq4j1aFhz","S2/t7pUCv9","e8t39zk","Nw47+WQosv","Mbf/XTzLO","CKilh5Ze2","N9/8knPvro","ETrvpR584gl","Mcbz2yadF","cgyr9iwGPd","fUFLagRA","OlFAIgkMJP3","XPGNf7pUCQ","AXSqCFl","PZ0QCdy","diGPWdLv9r5","RCQrykStf","iYJakVfu/1v","aDVnucKY","UjxVnDR","SI1ucOqYze","dq4OFMezh8u","L5ZBEHA4","N/nPLj749F","cjR1nDKBc4","Ux6s1jO","EIKilNtpBE0","F2zbYeG","Wk2vdyWEZ","FDb748E","NAw3/8EHfa","LWUsvrTQ","i1v+0lfudTE","Tls+ao6eDn8","QasRDVq4","Jzjgl95/nPL","ZGUm0iw","htz9ufVkTJ","I748cfbzDG","MGHEcf/XR","EFBpsU03zbY","F0cfbzw","W+sRDeXlT","cTBun1aMe6","EdaC6/nhJx0","i9u/1kar6pY","NXSi6CHnjL","HoILjDAEc","XpGPdygSEf","gfl28raUe","OHPLI47TXvs","fl0jZKUD","bkypwb/SE","NmGFBhlNtq","NRUk8MJNli","dOVnDR+3ucx","bBTlzhoa+","CPMI4AHfZ","CGBZx1da6","eaJYpzt","VjVHxoaI","V6l3ThFX","b7tfESgyd","aUiwGPdv","WGUiQ9vd5","eUDScNX","JDLOKilg4QT","NYQTrLOIgk","BG2yaCFt","SgLm0fNGbJ","TMaI1u3lXFh","Xf0iUCd5WE","Wgpwi0ZLv","beMaIsXzh","VRKBcxVD","SLdPrQ0m7p","Bc8MPLjm","HpRUXvsMI","cMhz6oFXsR","Pyk/JCU","Wjs+ao6lK","dqx4jRs6oTF","Cj7DGCay1","XDKBIaoTu8","TRDeXl3cOj1","Sk/bwUvCQ0","PnVjRsX","QsX6oa1n","GwgIMkh5","OCGe+6afYw0","Ybp7t/kPrZL","X7ypwiQrWE","gflv1/uka","C48cZe+WT","hWHNet3mcS","MAFdY49lh","HlimOuqvX","KAILjg4","CIMk85hlF","EeuOKqtV94Y","AZcEAG2","NfebYwz2GB","IosvP30cZB","UoaFXs+","dDKRaoT3BIj","A0EHCqu","IfnPJhmG+7","RsXzh8nVH","CCi6/5hkM","Z+sXOjI","LgQUsvoA","GmGCing4","HfbzTX/PI","SzYKBTFXs+","FLIOmj7","AURV1ya","YMez8q4cuTF","AAouO2y","QMaIsXzh","YASEWr92/t7","M0UXTz2ya","POcuKYz","eTCRis9","FbzDHCa","FIg4ADr","BfHDbeay","IBJhlg4IMs","g1vl28rhS","iMGVblUKZo5","dyg7fEZr5k/","Wbk/Sgydv","YGbSAk5dLZ9","BNIP/HCq","aTKYq4cB","F4gIMkn","dNf0ZLCUGp7","HPHngAFd9","Xn8hTFOHcK","dAbNWkypwiQ","TuToFOHVDRs","X9vUiQrWES","gctziRLBQ","WqYDVOHc3","CLzw1FCi6","CmGFdZBE0","SAbNp7t/kP","Q92/kPyg","AkhmGCa","Woh8nMFTl","CJKN1y3fb","ieNTk1vlbhw","KwYA48/","D1xRVtFAYc","P9QJbt/","KIJpsMP","XIasezY8uT","YIaFhYDn8q4","e2nt8y4","AZcYAG+","cJCLZEWPdv","dz6s+aFh8YD","eTk1/uf","DlinHvsU0x","NrbeYwIL7/","WnDKYq4cB","aHVDn8q4","ftz93mcW","Z3u8qcK","RkJCQ0mLg","Q2kPypbA","O6+4IOmiCqt","N4IOWT7+6a","W5yg7t2kW","RNUCd5wbA","aOj1n8q4","TbAtm7gLdr9","egq7xiY","IC6/4gAGeZ","UESJAbG","gqw6rxgaJ","bgZrQJASE","VoTBlzeM","NedZBFtquO","cpgydLZQiw","aJbwGPk2","K2eG+74","edn2s71","E0wYdF95+OL","AMsEAGm","PRIjxVn","EUMJPf30cYA","UdPrQ9v","T5wp7gSENb/","CNIOuoQX/","Dg4QXvrLz2","AroAw0c","dIBKcHj+RDe","Uw5k/bG","iZq7sbMCTND","TRjxcuThMes","JDAGebY4QU0","Yi9vmUNbJt7","TdvLSkPrZEf","gMWcixrlv","RucxOFThz","C87bYd96K","Y6zh8uK3+sX","PbwNfES","UQiUGp7","dygENWPdvUi","HZcfYwAEs","QoTuKYDe","bry5k/Sg7","K58/4gI","VMes1+jO","GXQw03fa","T2kPypwi0fE","cENfm7pUCQ","iev+0u/1kaJ","JmGHfcZBFli","SdCQr92/tf","UVOj+aM","MLIADroQX","UXlu3cx","Cw4gl95ZB","GFDbe2GB","eYpaUjZ","BR58UXTr","T6saI1ucOqY","bx6oTlXsI","Jhl9+7beGuq","A7LOJhn","C7/6afH3x","IpR5+ebDrv","elv1r8t","RcBIa1n8q","VMFXzhTu","W0t2bGp7f","clThYKu8qH","N6/4gIPvqS","et+vePV","DAYc8EBpuW","c3u1j4cKlz","UFOj1aM","S3cxVn8hTB","D46+uqCGmj","hUlbq0+veN","DMJhlg4Ybe","ZohzlTF","QAbGi9ZL","ht+vePFLVf","QRYKlzhM","O85ptoINlhB","fdMSj0u/","iuflUjt+0qw","H10xJMk8/","chaRIjOFT3","PASt7pG","WhYq4jR1n","LEFdayCH","CliCquGDz","fNeUDJTC","A0UXRpt","BsurLOmi","dJCUNbt/Sgy","VRDes+aF","SJCLm7gSkP","Efc0x1VRpuG","WneMao6lK","Vn1jVDe6","Np58cEBZd1","iWHNeUakzt+","E2eGAHf/4gk","GOLI47bf","HIAYcEHDj","D54Yf/6KNt","Hn/PI48kh","fyj0+t82","itjp60lfu/1","DpuW+5/nHE","WzlTFh8YK","CeZf/84QT","gScNDUev+","hVkz93msdn","fdTZISjy","g8yhQarxi","fdMWctn2","DoQRU85hBG","UWPkStf","YMao6lBIRjH","hhSYJapjdX","GeGDHfay","BopJOuqS","fSBQhyjp","Iz2xB58/4I","HNKPXvrTQ","gtcm39zp6","MCFNK69lh","PhFXzYK","iqbVLBQhSci","FHGCae2","W6zl3ThMn","EoAH3yK6+5Z","hLFUlWMSDJ","GDbf/HEs","GogILjmG","iBQhbRgx7qZ","Cc84+WTX3","cr5kSEZ0QC","XXOHVn8qcK","CNPL7/XU0","CkgQTrvoI","JYe+4oILrvX","V0iUp7t/","RUp7gLdCQ","NhkMsvpRx1","B2eYfHnh","EFtqSXQwILO","XKcq8YRIaF","N0kM849lhB","JJh59lgmGDb","WFXs+aoTu","K32ebzw","Wx4j1aoFX","ej0qZTN","Vw5kSAt7","GCADjgIM","BJx2wILr","T+18uThz6sR","DYAFdZe+OL","PqY8ucO","NJh58kMPIw","Tj+aFhzYKcu","Vt2bNp7m","NmlN1xJMkg","BDzwAEk8","fpYio5zk","N2+7rLOuqS","Tv2/t7gEWr5","V/bw5rdP","IlNJhkn/fa","LBEkg4AF","S7mUCv2/kW","P+s6xjI","MxwYbe2yK","hlbVLBQhSD","bgpy5k/bG","DAEHfbY49l","HHCadYAw0","BkhmG+6K","WaIsX6oMn","ebKZq7x","UBIaoT3","OGHnlNJhBEc","GTQW2OLr","JhB59limOIo","SnMox4qY8u","NHGe+7bDAw","ZCLgydv","XKcVDe6xjI","C1VSW2xZc","DuqKO2wAF9","QWk/SEf7","RGNfEgpb/","U81nVjI"];
+
+function decodePuzzle(encoded) {
+  const pieceNames = ['rook', 'bishop', 'knight'];
+  const difficultyNames = ['easy', 'medium', 'hard'];
+  const header = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+  const headerValue = header.indexOf(encoded[0]);
+  if (headerValue < 0) throw new Error('Invalid puzzle header');
+
+  const nOffset = headerValue % 5;
+  const combination = Math.floor(headerValue / 5);
+  const pieceIndex = Math.floor(combination / 3);
+  const difficultyIndex = combination % 3;
+  const N = nOffset + 6;
+
+  const solution = [];
+  for (let i = 0; i < N; ++i) {
+    const square = header.indexOf(encoded[i + 1]);
+    if (square < 0) throw new Error('Invalid puzzle square');
+    solution.push(square);
+  }
+
+  return {
+    piece: pieceNames[pieceIndex],
+    difficulty: difficultyNames[difficultyIndex],
+    N,
+    path: solution
+  };
+}
+
+function getRandomPuzzle(piece = 'random', difficulty = 'random', N = 'random') {
+  let candidates = PUZZLES;
+
+  if (piece !== 'random') {
+    candidates = candidates.filter(code => decodePuzzle(code).piece === piece);
+  }
+  if (difficulty !== 'random') {
+    candidates = candidates.filter(code => decodePuzzle(code).difficulty === difficulty);
+  }
+  if (N !== 'random') {
+    candidates = candidates.filter(code => decodePuzzle(code).N === Number(N));
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return decodePuzzle(candidates[Math.floor(Math.random() * candidates.length)]);
+}
+
+
+const PUZZLE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const PIECE_NAMES = ["rook", "bishop", "knight"];
+const DIFFICULTY_NAMES = ["easy", "medium", "hard"];
+
+function decodePuzzle(encoded) {
+  if (!encoded || encoded.length < 2) return null;
+
+  const headerValue = PUZZLE_ALPHABET.indexOf(encoded[0]);
+  if (headerValue < 0) return null;
+
+  const nOffset = headerValue % 5;
+  const combination = Math.floor(headerValue / 5);
+  const pieceIndex = Math.floor(combination / 3);
+  const difficultyIndex = combination % 3;
+  const N = nOffset + 6;
+
+  if (pieceIndex >= PIECE_NAMES.length || difficultyIndex >= DIFFICULTY_NAMES.length) {
+    return null;
+  }
+  if (encoded.length !== N + 1) return null;
+
+  const path = [];
+  for (let i = 0; i < N; ++i) {
+    const square = PUZZLE_ALPHABET.indexOf(encoded[i + 1]);
+    if (square < 0 || square >= 64) return null;
+    path.push(square);
+  }
+
+  return {
+    piece: PIECE_NAMES[pieceIndex],
+    difficulty: DIFFICULTY_NAMES[difficultyIndex],
+    N,
+    path
+  };
+}
+
+const DECODED_PUZZLES = PUZZLE_DATABASE
+  .map(decodePuzzle)
+  .filter(puzzle => puzzle !== null);
+
+function getRandomPuzzle(piece = "random", difficulty = "random", N = "random") {
+  const candidates = [];
+
+  for (const puzzle of DECODED_PUZZLES) {
+    if (piece !== "random" && puzzle.piece !== piece) continue;
+    if (difficulty !== "random" && puzzle.difficulty !== difficulty) continue;
+    if (N !== "random" && puzzle.N !== Number(N)) continue;
+    candidates.push(puzzle);
+  }
+
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+// Apply a random symmetry of the 8x8 board to a loaded puzzle.
+// This does not change the puzzle's piece, N, difficulty, or solvability.
+function augmentPath(path) {
+  const rotation = Math.floor(Math.random() * 4); // 0, 90, 180, 270 degrees
+  const mirrorHorizontal = Math.random() < 0.5; // left <-> right
+  const mirrorVertical = Math.random() < 0.5;   // top <-> bottom
+
+  return path.map(p => {
+    let r = row(p);
+    let c = col(p);
+
+    for (let i = 0; i < rotation; ++i) {
+      [r, c] = [c, BOARD_SIZE - 1 - r];
+    }
+
+    if (mirrorHorizontal) c = BOARD_SIZE - 1 - c;
+    if (mirrorVertical) r = BOARD_SIZE - 1 - r;
+
+    return pos(r, c);
+  });
+}
+
+function graphExtraEdges(piece, path) {
+  let edges = 0;
+  for (let i = 0; i < path.length; ++i) {
+    for (let j = i + 1; j < path.length; ++j) {
+      if (attacksOnEmptyBoard(piece, path[i], path[j])) ++edges;
+    }
+  }
+  return edges - (path.length - 1);
+}
+
+function row(pos) { return Math.floor(pos / BOARD_SIZE); }
+function col(pos) { return pos % BOARD_SIZE; }
+function pos(r, c) { return r * BOARD_SIZE + c; }
+function inside(r, c) { return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; }
+
+function squareName(p) {
+  return String.fromCharCode(97 + col(p)) + (8 - row(p));
+}
+
+function sameLine(piece, a, b) {
+  const ar = row(a), ac = col(a);
+  const br = row(b), bc = col(b);
+  const dr = Math.abs(ar - br);
+  const dc = Math.abs(ac - bc);
+
+  if (piece === "rook") return dr === 0 || dc === 0;
+  if (piece === "bishop") return dr === dc;
+  return (dr === 1 && dc === 2) || (dr === 2 && dc === 1);
+}
+
+function attacksOnEmptyBoard(piece, from, to) {
+  return from !== to && sameLine(piece, from, to);
+}
+
+/*
+ * Actual captures from 'from' with the given remaining stars.
+ * For rook/bishop, the first star on a ray is the only capturable star on it.
+ */
+function capturableStars(piece, from, remaining) {
+  const out = [];
+  const r = row(from), c = col(from);
+
+  if (piece === "knight") {
+    const jumps = [
+      [-2,-1],[-2,1],[-1,-2],[-1,2],
+      [1,-2],[1,2],[2,-1],[2,1]
+    ];
+    for (const [dr, dc] of jumps) {
+      const rr = r + dr, cc = c + dc;
+      if (inside(rr, cc)) {
+        const p = pos(rr, cc);
+        if (remaining.has(p)) out.push(p);
+      }
+    }
+    return out;
+  }
+
+  const directions = piece === "rook"
+    ? [[-1,0],[1,0],[0,-1],[0,1]]
+    : [[-1,-1],[-1,1],[1,-1],[1,1]];
+
+  for (const [dr, dc] of directions) {
+    let rr = r + dr;
+    let cc = c + dc;
+
+    while (inside(rr, cc)) {
+      const p = pos(rr, cc);
+      if (remaining.has(p)) {
+        out.push(p);
+        break;
+      }
+      rr += dr;
+      cc += dc;
+    }
+  }
+
+  return out;
+}
+
+const menuEl = document.getElementById("menu");
+const gameEl = document.getElementById("game");
+const boardEl = document.getElementById("board");
+const messageEl = document.getElementById("message");
+const pieceSelect = document.getElementById("pieceSelect");
+const nodesInput = document.getElementById("nodes");
+const difficultySelect = document.getElementById("difficulty");
+const rushTimeSelect = document.getElementById("rushTime");
+const rushOptionsEl = document.getElementById("rushOptions");
+const bestInfoEl = document.getElementById("bestInfo");
+const resetBtn = document.getElementById("resetBtn");
+const solutionBtn = document.getElementById("solutionBtn");
+const newPuzzleBtn = document.getElementById("newPuzzleBtn");
+const backBtn = document.getElementById("backBtn");
+const startBtn = document.getElementById("startBtn");
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlayTitle");
+const overlayText = document.getElementById("overlayText");
+const overlayBtn = document.getElementById("overlayBtn");
+const solutionPanel = document.getElementById("solutionPanel");
+const solutionLine = document.getElementById("solutionLine");
+const rushStatBox = document.getElementById("rushStatBox");
+const rushClock = document.getElementById("rushClock");
+
+let mode = "casual";
+let state = null;
+let dragGhost = null;
+let dragPointerId = null;
+let rushTimer = null;
+let rushEnd = 0;
+let rushSeconds = 0;
+
+function keyForBestStreak() {
+  return "starChessBestStreak";
+}
+
+function keyForRush(seconds) {
+  return `starChessRush${seconds}`;
+}
+
+function getBestStreak() {
+  return Number(localStorage.getItem(keyForBestStreak()) || 0);
+}
+
+function getBestRush(seconds) {
+  return Number(localStorage.getItem(keyForRush(seconds)) || 0);
+}
+
+function updateMenuInfo() {
+  if (mode === "streak") {
+    bestInfoEl.textContent = `Best streak: ${getBestStreak()}`;
+  } else if (mode === "rush") {
+    const seconds = Number(rushTimeSelect.value);
+    bestInfoEl.textContent = `Best score (${seconds / 60}-minute rush): ${getBestRush(seconds)}`;
+  } else {
+    bestInfoEl.textContent = "";
+  }
+  rushOptionsEl.classList.toggle("visible", mode === "rush");
+}
+
+function hideOverlay() {
+  overlay.classList.add("hidden");
+}
+
+function showOverlay(title, text, buttonText, callback) {
+  overlayTitle.textContent = title;
+  overlayText.textContent = text;
+  overlayBtn.textContent = buttonText;
+  overlayBtn.onclick = callback;
+  overlay.classList.remove("hidden");
+}
+
+function clearRushTimer() {
+  if (rushTimer !== null) {
+    clearInterval(rushTimer);
+    rushTimer = null;
+  }
+}
+
+function stopRush() {
+  clearRushTimer();
+}
+
+function startRushTimer(seconds) {
+  clearRushTimer();
+  rushSeconds = seconds;
+  rushEnd = Date.now() + seconds * 1000;
+  rushStatBox.classList.remove("hidden");
+  updateRushClock();
+  rushTimer = setInterval(() => {
+    updateRushClock();
+    if (Date.now() >= rushEnd) finishRush();
+  }, 100);
+}
+
+function updateRushClock() {
+  const left = Math.max(0, rushEnd - Date.now());
+  const totalSeconds = Math.ceil(left / 1000);
+  const min = Math.floor(totalSeconds / 60);
+  const sec = totalSeconds % 60;
+  rushClock.textContent = `${min}:${String(sec).padStart(2, "0")}`;
+}
+
+function finishRush() {
+  if (mode !== "rush") return;
+  clearRushTimer();
+  const score = state ? state.rushSolved : 0;
+  const best = getBestRush(rushSeconds);
+  if (score > best) localStorage.setItem(keyForRush(rushSeconds), String(score));
+  showOverlay(
+    "Time!",
+    `You solved ${score} puzzle${score === 1 ? "" : "s"}. Best: ${Math.max(score, best)}.`,
+    "Back to Menu",
+    () => {
+      hideOverlay();
+      backToMenu();
+    }
+  );
+}
+
+function choosePuzzle() {
+  const N = Math.max(6, Math.min(10, Number(nodesInput.value) || 8));
+  const difficulty = difficultySelect.value;
+  const puzzle = getRandomPuzzle(pieceSelect.value, difficulty, N);
+  return { puzzle, N, difficulty };
+}
+
+function makePuzzleForCurrentConfig() {
+  const { puzzle } = choosePuzzle();
+  messageEl.className = "message neutral";
+  messageEl.textContent = "Loading puzzle…";
+
+  if (!puzzle) return null;
+
+  const path = augmentPath(puzzle.path);
+
+  state = {
+    piece: puzzle.piece,
+    difficulty: puzzle.difficulty,
+    path,
+    extra: graphExtraEdges(puzzle.piece, path),
+    current: path[0],
+    remaining: new Set(path.slice(1)),
+    moves: 0,
+    history: [],
+    solved: false,
+    solutionShown: false,
+    rushSolved: state && mode === "rush" ? state.rushSolved : 0,
+    streak: state && mode === "streak" ? state.streak : 0
+  };
+
+  solutionPanel.classList.add("hidden");
+  solutionLine.innerHTML = "";
+  updateControls();
+  renderBoard();
+  return state;
+}
+
+function startMode() {
+  hideOverlay();
+  clearRushTimer();
+  state = null;
+  const puzzle = makePuzzleForCurrentConfig();
+  if (!puzzle) {
+    messageEl.className = "message bad";
+    messageEl.textContent = "No puzzle in the database matches these settings. Generate more layouts or change the filters.";
+    menuEl.classList.remove("hidden");
+    gameEl.classList.add("hidden");
+    return;
+  }
+
+  menuEl.classList.add("hidden");
+  gameEl.classList.remove("hidden");
+
+  if (mode === "rush") {
+    startRushTimer(Number(rushTimeSelect.value));
+  } else {
+    rushStatBox.classList.add("hidden");
+  }
+
+  updateSidebar();
+}
+
+function startNextPuzzlePreservingScore() {
+  const oldRushSolved = state ? state.rushSolved : 0;
+  const oldStreak = state ? state.streak : 0;
+  const puzzle = makePuzzleForCurrentConfig();
+  if (!puzzle) {
+    messageEl.className = "message bad";
+    messageEl.textContent = "No matching puzzle remains in the database for these settings.";
+    return false;
+  }
+  state.rushSolved = oldRushSolved;
+  state.streak = oldStreak;
+  updateSidebar();
+  return true;
+}
+
+function finishCasualPuzzle() {
+  state.solved = true;
+  messageEl.className = "message good";
+  messageEl.textContent = `Solved in ${state.moves} moves.`;
+  updateControls();
+  if (state.solutionShown) renderSolutionOverlay();
+}
+
+function finishStreakPuzzle() {
+  state.solved = true;
+  state.streak++;
+  if (state.streak > getBestStreak()) {
+    localStorage.setItem(keyForBestStreak(), String(state.streak));
+  }
+  messageEl.className = "message good";
+  messageEl.textContent = `Correct. Streak: ${state.streak}`;
+  updateSidebar();
+
+  setTimeout(() => {
+    if (mode !== "streak" || !state || !state.solved) return;
+    startNextPuzzlePreservingScore();
+  }, 350);
+}
+
+function finishRushPuzzle() {
+  state.solved = true;
+  state.rushSolved++;
+  messageEl.className = "message good";
+  messageEl.textContent = `Solved. Score: ${state.rushSolved}`;
+  updateSidebar();
+
+  if (Date.now() >= rushEnd) {
+    finishRush();
+    return;
+  }
+
+  setTimeout(() => {
+    if (mode !== "rush" || !state || !state.solved) return;
+    startNextPuzzlePreservingScore();
+  }, 150);
+}
+
+function wrongStreakMove() {
+  messageEl.className = "message bad";
+  messageEl.textContent = "Wrong move — streak ended.";
+  const best = getBestStreak();
+  showOverlay(
+    "Streak ended",
+    `Streak: ${state.streak}. Best: ${best}.`,
+    "Back to Menu",
+    () => {
+      hideOverlay();
+      backToMenu();
+    }
+  );
+}
+
+function attemptMove(to) {
+  if (!state || state.solved) return false;
+  const moves = capturableStars(state.piece, state.current, state.remaining);
+  if (!moves.includes(to)) {
+    if (mode === "streak") wrongStreakMove();
+    return false;
+  }
+
+  state.history.push({
+    current: state.current,
+    remaining: new Set(state.remaining),
+    moves: state.moves,
+    last: state.last
+  });
+  state.last = state.current;
+  state.current = to;
+  state.remaining.delete(to);
+  state.moves++;
+  renderBoard();
+  updateSidebar();
+
+  if (state.remaining.size === 0) {
+    if (mode === "casual") finishCasualPuzzle();
+    else if (mode === "streak") finishStreakPuzzle();
+    else finishRushPuzzle();
+  }
+  return true;
+}
+
+function resetPuzzle() {
+  if (!state || state.solved) return;
+  state.current = state.path[0];
+  state.remaining = new Set(state.path.slice(1));
+  state.moves = 0;
+  state.last = null;
+  state.history = [];
+  state.solutionShown = false;
+  solutionPanel.classList.add("hidden");
+  solutionLine.innerHTML = "";
+  messageEl.className = "message";
+  messageEl.textContent = "Capture a highlighted star.";
+  renderBoard();
+  updateSidebar();
+  updateControls();
+}
+
+function showSolution() {
+  if (!state || mode !== "casual" || state.solutionShown) return;
+  state.solutionShown = true;
+  renderSolutionOverlay();
+  renderBoard();
+  updateControls();
+}
+
+function renderSolutionOverlay() {
+  solutionLine.innerHTML = "";
+  for (let i = 1; i < state.path.length; ++i) {
+    const chip = document.createElement("span");
+    chip.className = "solution-chip";
+    chip.textContent = `${i}. ${squareName(state.path[i])}`;
+    solutionLine.appendChild(chip);
+  }
+  solutionPanel.classList.remove("hidden");
+}
+
+function renderBoard() {
+  boardEl.innerHTML = "";
+  const targets = new Set(state ? capturableStars(state.piece, state.current, state.remaining) : []);
+
+  for (let p = 0; p < 64; ++p) {
+    const r = row(p), c = col(p);
+    const sq = document.createElement("div");
+    sq.className = "square " + (((r + c) % 2 === 0) ? "light" : "dark");
+    sq.dataset.pos = String(p);
+
+    if (targets.has(p)) sq.classList.add("target");
+    if (state && state.last === p) sq.classList.add("last");
+
+    if (state && state.solutionShown && state.path.includes(p)) {
+      sq.classList.add("solution-arrow");
+    }
+
+    if (r === 7) {
+      const f = document.createElement("span");
+      f.className = "coord-file";
+      f.textContent = String.fromCharCode(97 + c);
+      sq.appendChild(f);
+    }
+    if (c === 0) {
+      const rank = document.createElement("span");
+      rank.className = "coord-rank";
+      rank.textContent = String(8 - r);
+      sq.appendChild(rank);
+    }
+
+    if (state && state.remaining.has(p)) {
+      const star = document.createElement("span");
+      star.className = "star";
+      star.textContent = "★";
+      sq.appendChild(star);
+    }
+
+    if (state && state.current === p) {
+      const piece = document.createElement("span");
+      piece.className = "piece";
+      piece.textContent = PIECES[state.piece].symbol;
+      sq.appendChild(piece);
+      sq.addEventListener("pointerdown", beginDrag);
+    }
+
+    sq.addEventListener("click", () => handleClick(p));
+    boardEl.appendChild(sq);
+  }
+
+  if (state && state.solutionShown) drawSolutionArrows();
+}
+
+function handleClick(p) {
+  if (!state || state.solved) return;
+  attemptMove(p);
+}
+
+function boardCenterForPos(p) {
+  const sq = boardEl.children[p];
+  const rect = sq.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function beginDrag(e) {
+  if (!state || state.solved) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  dragPointerId = e.pointerId;
+
+  const ghost = document.createElement("div");
+  ghost.className = "drag-ghost";
+  ghost.textContent = PIECES[state.piece].symbol;
+  document.body.appendChild(ghost);
+  dragGhost = ghost;
+  moveDragGhost(e.clientX, e.clientY);
+
+  window.addEventListener("pointermove", dragMove);
+  window.addEventListener("pointerup", endDrag, { once: true });
+  window.addEventListener("pointercancel", cancelDrag, { once: true });
+  e.preventDefault();
+}
+
+function moveDragGhost(x, y) {
+  if (!dragGhost) return;
+  dragGhost.style.left = `${x}px`;
+  dragGhost.style.top = `${y}px`;
+}
+
+function dragMove(e) {
+  if (e.pointerId !== dragPointerId) return;
+  moveDragGhost(e.clientX, e.clientY);
+}
+
+function endDrag(e) {
+  if (e.pointerId !== dragPointerId) return;
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const square = hit && hit.closest ? hit.closest(".square") : null;
+  const to = square ? Number(square.dataset.pos) : -1;
+  cleanupDrag();
+  if (to >= 0) attemptMove(to);
+  else renderBoard();
+}
+
+function cancelDrag(e) {
+  if (e.pointerId !== dragPointerId) return;
+  cleanupDrag();
+  renderBoard();
+}
+
+function cleanupDrag() {
+  if (dragGhost) dragGhost.remove();
+  dragGhost = null;
+  dragPointerId = null;
+  window.removeEventListener("pointermove", dragMove);
+}
+
+function drawSolutionArrows() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.style.position = "absolute";
+  svg.style.inset = "0";
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+  svg.style.pointerEvents = "none";
+  svg.style.zIndex = "5";
+  boardEl.style.position = "relative";
+
+  const boardRect = boardEl.getBoundingClientRect();
+  const cell = boardRect.width / 8;
+  svg.setAttribute("viewBox", `0 0 ${boardRect.width} ${boardRect.height}`);
+
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+  marker.setAttribute("id", "arrowhead");
+  marker.setAttribute("markerWidth", "7");
+  marker.setAttribute("markerHeight", "7");
+  marker.setAttribute("refX", "5");
+  marker.setAttribute("refY", "3.5");
+  marker.setAttribute("orient", "auto");
+  const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+  polygon.setAttribute("points", "0 0, 7 3.5, 0 7");
+  polygon.setAttribute("fill", "#2563eb");
+  marker.appendChild(polygon);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  for (let i = 0; i < state.path.length - 1; ++i) {
+    const a = state.path[i];
+    const b = state.path[i + 1];
+    const ar = row(a), ac = col(a);
+    const br = row(b), bc = col(b);
+    const x1 = ac * cell + cell / 2;
+    const y1 = ar * cell + cell / 2;
+    const x2 = bc * cell + cell / 2;
+    const y2 = br * cell + cell / 2;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("stroke", "#2563eb");
+    line.setAttribute("stroke-width", Math.max(2, cell * .035));
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("marker-end", "url(#arrowhead)");
+    svg.appendChild(line);
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", x2);
+    circle.setAttribute("cy", y2);
+    circle.setAttribute("r", Math.max(10, cell * .16));
+    circle.setAttribute("fill", "white");
+    circle.setAttribute("fill-opacity", ".88");
+    circle.setAttribute("stroke", "#2563eb");
+    circle.setAttribute("stroke-width", "2");
+    svg.appendChild(circle);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", x2);
+    text.setAttribute("y", y2 + Math.max(4, cell * .055));
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", Math.max(12, cell * .18));
+    text.setAttribute("font-weight", "800");
+    text.setAttribute("fill", "#2563eb");
+    text.textContent = String(i + 1);
+    svg.appendChild(text);
+  }
+
+  boardEl.appendChild(svg);
+}
+
+function updateSidebar() {
+  if (!state) return;
+  document.getElementById("pieceStat").textContent = PIECES[state.piece].name;
+  document.getElementById("starsStat").textContent = state.remaining.size;
+  document.getElementById("movesStat").textContent = state.moves;
+  document.getElementById("optimalStat").textContent = state.path.length - 1;
+  document.getElementById("extraStat").textContent = state.extra;
+
+  const recordLabel = document.getElementById("recordLabel");
+  const recordStat = document.getElementById("recordStat");
+  if (mode === "casual") {
+    recordLabel.textContent = "DIFFICULTY";
+    recordStat.textContent = state.difficulty[0].toUpperCase() + state.difficulty.slice(1);
+  } else if (mode === "streak") {
+    recordLabel.textContent = "STREAK";
+    recordStat.textContent = state.streak;
+  } else {
+    recordLabel.textContent = "SCORE";
+    recordStat.textContent = state.rushSolved;
+  }
+}
+
+function updateControls() {
+  resetBtn.disabled = !state || state.solved;
+  solutionBtn.disabled = mode !== "casual" || !state || state.solutionShown;
+  newPuzzleBtn.disabled = mode !== "casual";
+  if (mode === "rush") newPuzzleBtn.disabled = false;
+}
+
+function setMode(newMode) {
+  mode = newMode;
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.classList.toggle("active", tab.dataset.mode === mode);
+  });
+  updateMenuInfo();
+}
+
+function backToMenu() {
+  clearRushTimer();
+  hideOverlay();
+  gameEl.classList.add("hidden");
+  menuEl.classList.remove("hidden");
+  rushStatBox.classList.add("hidden");
+  updateMenuInfo();
+}
+
+function newCasualPuzzle() {
+  if (mode !== "casual") return;
+  makePuzzleForCurrentConfig();
+  updateSidebar();
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => setMode(tab.dataset.mode));
+});
+
+rushTimeSelect.addEventListener("change", updateMenuInfo);
+startBtn.addEventListener("click", startMode);
+resetBtn.addEventListener("click", resetPuzzle);
+solutionBtn.addEventListener("click", showSolution);
+newPuzzleBtn.addEventListener("click", () => {
+  if (mode === "casual") newCasualPuzzle();
+  else if (mode === "rush") startNextPuzzlePreservingScore();
+});
+backBtn.addEventListener("click", backToMenu);
+
+updateMenuInfo();
+</script>
+</body>
+</html>
